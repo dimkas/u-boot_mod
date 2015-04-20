@@ -1,4 +1,4 @@
-/* $Id: //depot/sw/releases/Aquila_9.2.0_U5/boot/u-boot/include/asm-mips/types.h#1 $
+/*
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -69,8 +69,21 @@ typedef unsigned long long u64;
 #endif
 
 #define BITS_PER_LONG _MIPS_SZLONG
+#if (defined(CONFIG_HIGHMEM) && defined(CONFIG_64BIT_PHYS_ADDR)) \
+    || defined(CONFIG_64BIT)
+typedef u64 dma_addr_t;
 
-typedef unsigned long dma_addr_t;
+typedef u64 phys_addr_t;
+typedef u64 phys_size_t;
+
+#else
+typedef u32 dma_addr_t;
+
+typedef u32 phys_addr_t;
+typedef u32 phys_size_t;
+
+#endif
+
 
 #endif /* __KERNEL__ */
 

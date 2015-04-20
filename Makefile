@@ -1,7 +1,8 @@
 export BUILD_TOPDIR=$(PWD)
 export STAGING_DIR=$(BUILD_TOPDIR)/tmp
 
-export MAKECMD=make --silent ARCH=mips CROSS_COMPILE=mips-linux-gnu-
+export MAKECMD=make ARCH=mips CROSS_COMPILE=mips-openwrt-linux-uclibc-
+export PATH:=/home/bsb/openwrt/staging_dir/toolchain-mips_34kc_gcc-4.8-linaro_uClibc-0.9.33.2/bin/:$(PATH)
 
 # boot delay (time to autostart boot command)
 export CONFIG_BOOTDELAY=1
@@ -154,6 +155,16 @@ gs-oolite_v1_dev:	export MAX_UBOOT_SIZE=64
 gs-oolite_v1_dev:	export COMPRESSED_UBOOT=1
 gs-oolite_v1_dev:
 	@cd $(BUILD_TOPDIR)/u-boot/ && $(MAKECMD) gs_oolite_v1_dev_config
+	@cd $(BUILD_TOPDIR)/u-boot/ && $(MAKECMD) ENDIANNESS=-EB V=1 all
+	@cp $(BUILD_TOPDIR)/u-boot/tuboot.bin $(BUILD_TOPDIR)/bin/temp.bin
+	@make show_size
+
+bsb:	export UBOOT_FILE_NAME=uboot_for_bsb
+bsb:	export MAX_UBOOT_SIZE=128
+bsb:	export COMPRESSED_UBOOT=1
+bsb:	export DEVICE_VENDOR=SE
+bsb:
+	@cd $(BUILD_TOPDIR)/u-boot/ && $(MAKECMD) bsb_config
 	@cd $(BUILD_TOPDIR)/u-boot/ && $(MAKECMD) ENDIANNESS=-EB V=1 all
 	@cp $(BUILD_TOPDIR)/u-boot/tuboot.bin $(BUILD_TOPDIR)/bin/temp.bin
 	@make show_size

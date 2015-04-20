@@ -39,6 +39,8 @@ extern void all_led_on(void);
 extern void all_led_off(void);
 extern int NetLoopHttpd(void);
 
+extern int show_partition_error;
+
 #define MAX_DELAY_STOP_STR 32
 
 static char *delete_char(char *buffer, char *p, int *colp, int *np, int plen);
@@ -119,6 +121,311 @@ static __inline__ int abortboot(int bootdelay){
 
 /****************************************************************************/
 
+static void blink_led(int count,int delay)
+{
+	int i=0;
+
+	all_led_off();
+
+	for(; i < count; ++i)
+	{
+		all_led_on();
+		milisecdelay(delay);
+
+		all_led_off();
+		milisecdelay(delay);
+	}
+}
+
+/****************************************************************************/
+
+static int bsb_run(const char* command)
+{
+debug("Run \"%s\":\n",command);
+
+	return (run_command(command,0) >= 0);
+}
+
+/****************************************************************************/
+
+static int load_file(const char* path,unsigned long addr)
+{
+	char buffer[256];
+
+	const char *filesize_str;
+	unsigned long filesize=0;
+
+	setenv("filesize", "0");
+
+	sprintf(buffer,
+		"fatload usb 0:1 0x%X %s",
+		addr,
+		path);
+
+	if(bsb_run(buffer))
+	{
+		filesize_str = getenv("filesize");
+		if (filesize_str != NULL)
+			filesize = simple_strtoul(filesize_str, NULL, 16);
+
+		return filesize;
+	}
+
+	return -1;
+}
+
+/****************************************************************************/
+
+static void usb_upgrade(void)
+{
+	int isOK=0;
+	int needReset=0;
+
+	if(bsb_run("usb reset"))
+	{
+		char buffer[256];
+
+		const char *addr_str;
+		unsigned long addr=0;
+
+		int filesize=0;
+
+		int was_show_error=show_partition_error;
+		show_partition_error=0;
+
+		addr_str = getenv("loadaddr");
+		if (addr_str != NULL)
+			addr = simple_strtoul(addr_str, NULL, 16);
+		else
+			addr = CONFIG_SYS_LOAD_ADDR;
+
+		if(load_file("bsb_mac.bin",addr) == 6)
+		{	
+			show_partition_error=was_show_error;
+
+			//	update mac address and increment source
+			unsigned char *macByte=(unsigned char*)addr;
+			unsigned short *macLastWord=((unsigned short*)addr)+2;
+
+			sprintf(buffer,
+				"setmac %02X:%02X:%02X:%02X:%02X:%02X",
+				macByte[0],
+				macByte[1],
+				macByte[2],
+				macByte[3],
+				macByte[4],
+				macByte[5]);
+
+			bsb_run(buffer);
+
+			*macLastWord=(*macLastWord)+4;	//	increment for the next board
+
+			sprintf(buffer,
+				"fatwrite usb 0:1 0x%X bsb_mac.bin 6",
+				addr);
+
+			if(bsb_run(buffer))
+			{
+				isOK=1;
+				needReset=1;
+			}
+		}
+		else
+		{
+			if((filesize=load_file("_bsb/autorun",addr)) > 0)
+			{
+				show_partition_error=was_show_error;
+
+				printf("Autorun script is found.\n");
+				if(filesize < 0x10000)
+				{
+					char script[0x10000];
+					char *pDst=script;
+					char *pSrc=(char*)addr;
+					char *pEnd=pSrc+filesize;
+
+					while(pSrc < pEnd)
+					{
+						char next=*pSrc++;
+						if(next == '\n')
+						{
+							*pDst++=';';
+						}
+						else if(next == '\r')
+						{
+						//	just skip it
+						}
+						else
+						{
+							*pDst++=next;
+						}
+					}
+
+					*pDst=0;
+
+					bsb_run(script);
+					isOK=1;
+				}
+				else
+				{
+					printf("Error: autorun script is too big (0x10000 or more)!\n");
+				}
+			}
+			else
+			{
+				//	try to upgrade some partition
+				int partition=-1;
+
+				filesize=load_file("_bsb/u-boot.bin",addr);
+				if(filesize == 0x20000)
+				{
+					partition=0;
+				}
+				else
+				{
+					filesize=load_file("_bsb/u-boot-env.bin",addr);
+					if(filesize == 0x10000)
+					{
+						partition=1;
+					}
+					else
+					{
+						filesize=load_file("_bsb/firmware.bin",addr);
+						if(filesize > 0)
+						{
+							partition=2;
+						}
+						else
+						{
+							filesize=load_file("_bsb/art.bin",addr);
+							if(filesize == 0x10000)
+							{
+								partition=3;
+							}
+							else
+							{
+								filesize=load_file("_bsb/dump.bin",addr);
+								if(filesize == 0x1000000)
+								{
+									partition=4;
+								}
+							}
+						}
+					}
+				}
+
+				show_partition_error=was_show_error;
+
+				if(partition >= 0)
+				{
+					unsigned long addr_in_flash=0;
+
+					switch(partition)
+					{
+						case 0:
+							addr_in_flash=CFG_FLASH_BASE;	//	U-Boot
+							printf("Upgrading 'u-boot' partition...\n");
+							break;
+
+						case 1:
+							addr_in_flash=CFG_ENV_ADDR;	//	U-Boot env
+							printf("Upgrading 'u-boot-env' partition...\n");
+							break;
+
+						case 2:
+							addr_in_flash=CFG_LOAD_ADDR;	//	firmware
+							printf("Upgrading 'firmware' partition...\n");
+							break;
+
+						case 3:
+							addr_in_flash=CFG_FLASH_BASE+OFFSET_MAC_DATA_BLOCK;	//	ART
+							printf("Upgrading 'art' partition...\n");
+							break;
+
+						case 4:
+							addr_in_flash=CFG_FLASH_BASE;	//	all 16M of flash memory
+							printf("Upgrading all partitions from binary dump...\n");
+							break;
+					}
+
+					sprintf(buffer,
+						"erase 0x%X +0x%X; cp.b 0x%X 0x%X 0x%X",
+						addr_in_flash,
+						filesize,
+						addr,
+						addr_in_flash,
+						filesize);
+
+					if(bsb_run(buffer))
+					{
+						isOK=1;
+						needReset=1;
+					}
+				}
+				else
+				{
+					printf("Nothing to do - no files found.\n");
+				}
+			}
+		}
+	}
+	else
+	{
+		printf("No USB storage found.\n");
+	}
+
+	if(isOK)
+	{
+		blink_led(5,250);
+	}
+	else
+	{
+		blink_led(20,100);
+	}
+
+	if(needReset)
+	{
+		bsb_run("reset");
+	}
+	else
+	{
+		printf("Starting U-Boot console...\n");
+	}
+}
+
+
+/****************************************************************************/
+
+static void blink_sys_led(int stage)
+{
+	all_led_off();
+
+	if(stage)
+	{
+		int d=100;
+		int count=stage;
+		int rest=1000-(stage*2*d);
+		int i=0;
+
+		for(; i < count; ++i)
+		{
+			all_led_on();
+			milisecdelay(d);
+
+			all_led_off();
+			milisecdelay(d);
+		}
+
+		milisecdelay(rest);
+	}
+	else
+	{
+		milisecdelay(1000);
+	}
+}
+
+/****************************************************************************/
+
 void main_loop(void){
 #ifndef CFG_HUSH_PARSER
 	static char lastcommand[CFG_CBSIZE] = { 0, };
@@ -127,6 +434,7 @@ void main_loop(void){
 	int flag;
 #endif
 	int counter = 0;
+	int stage=0;
 
 #if defined(CONFIG_BOOTDELAY) && (CONFIG_BOOTDELAY >= 0)
 	char *s;
@@ -169,36 +477,63 @@ void main_loop(void){
 		gd->flags &= ~(GD_FLG_SILENT);
 #endif
 
+		all_led_off();
 		// wait 0,5s
-		milisecdelay(500);
+//		milisecdelay(500);
 
-		printf("Press reset button for at least:\n- %d sec. to run web failsafe mode\n- %d sec. to run U-Boot console\n- %d sec. to run U-Boot netconsole\n\n",
-				CONFIG_DELAY_TO_AUTORUN_HTTPD,
+		printf("Press reset button for at least:\n"
+			"- %d sec. to run upgrade from USB flash\n"
+			"- %d sec. to run U-Boot console\n"
+			"- %d sec. to run HTTP server\n"
+			"- %d sec. to run netconsole\n\n",
+				CONFIG_DELAY_TO_AUTORUN_USB,
 				CONFIG_DELAY_TO_AUTORUN_CONSOLE,
+				CONFIG_DELAY_TO_AUTORUN_HTTPD,
 				CONFIG_DELAY_TO_AUTORUN_NETCONSOLE);
 
 		printf("Reset button is pressed for: %2d ", counter);
 
 		while(reset_button_status()){
 
-			// LED ON and wait 0,15s
-			all_led_on();
-			milisecdelay(150);
-
-			// LED OFF and wait 0,85s
-			all_led_off();
-			milisecdelay(850);
-
-			counter++;
-
-			// how long the button is pressed?
-			printf("\b\b\b%2d ", counter);
+			blink_sys_led(stage);	//	1 second!
 
 			if(!reset_button_status()){
 				break;
 			}
 
+			counter++;
+
+			if(counter >= CONFIG_DELAY_TO_AUTORUN_USB)
+			{
+				if(counter >= CONFIG_DELAY_TO_AUTORUN_CONSOLE)
+				{
+					if(counter >= CONFIG_DELAY_TO_AUTORUN_HTTPD)
+					{
+						if(counter >= CONFIG_DELAY_TO_AUTORUN_NETCONSOLE)
+						{
+							stage=4;
+						}
+						else
+						{
+							stage=3;
+						}
+					}
+					else
+					{
+						stage=2;
+					}
+				}
+				else
+				{
+					stage=1;
+				}
+			}			
+
+			// how long the button is pressed?
+			printf("\b\b\b%2d ", counter);
+
 			if(counter >= CONFIG_MAX_BUTTON_PRESSING){
+				stage=0;	//	normal boot
 				break;
 			}
 		}
@@ -208,14 +543,18 @@ void main_loop(void){
 		if(counter > 0){
 
 			// run web failsafe mode
-			if(counter >= CONFIG_DELAY_TO_AUTORUN_HTTPD && counter < CONFIG_DELAY_TO_AUTORUN_CONSOLE){
+			if(stage == 1){
+				printf("\n\nButton was pressed for %d sec...\nStarting upgrage from USB flash...\n\n", counter);
+				bootdelay = -1;
+				usb_upgrade();
+			} else if(stage == 2){
+				printf("\n\nButton was pressed for %d sec...\nStarting U-Boot console...\n\n", counter);
+				bootdelay = -1;
+			} else if(stage == 3){
 				printf("\n\nButton was pressed for %d sec...\nHTTP server is starting for firmware update...\n\n", counter);
 				NetLoopHttpd();
 				bootdelay = -1;
-			} else if(counter >= CONFIG_DELAY_TO_AUTORUN_CONSOLE && counter < CONFIG_DELAY_TO_AUTORUN_NETCONSOLE){
-				printf("\n\nButton was pressed for %d sec...\nStarting U-Boot console...\n\n", counter);
-				bootdelay = -1;
-			} else if(counter >= CONFIG_DELAY_TO_AUTORUN_NETCONSOLE){
+			} else if(stage == 4){
 				printf("\n\nButton was pressed for %d sec...\nStarting U-Boot netconsole...\n\n", counter);
 				bootdelay = -1;
 				run_command("startnc", 0);

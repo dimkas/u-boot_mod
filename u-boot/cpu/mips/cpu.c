@@ -23,7 +23,9 @@
 
 #include <common.h>
 #include <command.h>
+#include <asm/inca-ip.h>
 #include <asm/mipsregs.h>
+#include <asm/cacheops.h>
 
 #if defined(CONFIG_AR7100)
 #include <asm/addrspace.h>
@@ -35,46 +37,116 @@
 #include <ar7240_soc.h>
 #endif
 
-int do_reset(cmd_tbl_t *cmdtp, int flag, int argc, char *argv[]){
-#if defined(CONFIG_AR7100)
-	for(;;){
-		ar7100_reg_wr(AR7100_RESET, (AR7100_RESET_FULL_CHIP | AR7100_RESET_DDR));
-	}
-#elif defined(CONFIG_AR7240)
-#ifndef COMPRESSED_UBOOT
-	fprintf(stdout, "\nResetting the board...\n");
-	milisecdelay(500);
-#endif  /* #ifndef COMPRESSED_UBOOT */
-	for(;;){
-	#ifdef CONFIG_WASP
-		if(ar7240_reg_rd(AR7240_REV_ID) & 0xf){
-			ar7240_reg_wr(AR7240_RESET, (AR7240_RESET_FULL_CHIP | AR7240_RESET_DDR));
-		} else {
-	/*
-	* WAR for full chip reset spi vs. boot-rom selection
-	* bug in wasp 1.0
-	*/
-			ar7240_reg_wr(AR7240_GPIO_OE, ar7240_reg_rd(AR7240_GPIO_OE) & (~(1 << 17)));
-		}
-	#else
-		ar7240_reg_wr(AR7240_RESET, (AR7240_RESET_FULL_CHIP | AR7240_RESET_DDR));
-	#endif
-	}
+#if defined(CONFIG_ATHEROS)
+#include <asm/addrspace.h>
+#include <atheros.h>
 #endif
-#ifndef COMPRESSED_UBOOT
-	fprintf(stderr, "\n*** ERROR: RESET FAILED! ***\n");
-#endif  /* #ifndef COMPRESSED_UBOOT */
-	return(0);
-}
+
+#define cache_op(op,addr)						\
+	__asm__ __volatile__(						\
+	"	.set	push					\n"	\
+	"	.set	noreorder				\n"	\
+	"	.set	mips3\n\t				\n"	\
+	"	cache	%0, %1					\n"	\
+	"	.set	pop					\n"	\
+	:								\
+	: "i" (op), "R" (*(unsigned char *)(addr)))
 
 extern void dcache_flush_range(u32 a, u32 end);
 
-void flush_cache(ulong start_addr, ulong size){
-	u32 end, a;
+int do_reset(cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+{
+#if defined(CONFIG_ATHEROS)
+	while (1) {
+		ath_reg_wr(RST_RESET_ADDRESS, RST_RESET_FULL_CHIP_RESET_SET(1));
+	}
+#elif defined(CONFIG_INCA_IP)
+	*INCA_IP_WDT_RST_REQ = 0x3f;
+#elif defined(CONFIG_PURPLE) || defined(CONFIG_TB0229)
+	void (*f)(void) = (void *) 0xbfc00000;
 
-	a = start_addr & ~(CFG_CACHELINE_SIZE - 1);
-	size = (size + CFG_CACHELINE_SIZE - 1) & ~(CFG_CACHELINE_SIZE - 1);
-	end = a + size;
+	f();
+#elif defined(CONFIG_AR7100)
+#ifndef COMPRESSED_UBOOT
+	fprintf(stdout, "\nResetting...\n");
+#endif  /* #ifndef COMPRESSED_UBOOT */
+	for (;;) {
+		ar7100_reg_wr(AR7100_RESET,
+			(AR7100_RESET_FULL_CHIP | AR7100_RESET_DDR));
+	}
+#elif defined(CONFIG_AR7240)
+#ifndef COMPRESSED_UBOOT
+	fprintf(stdout, "\nResetting...\n");
+#endif  /* #ifndef COMPRESSED_UBOOT */
+	for (;;) {
+#ifdef CONFIG_WASP
+		if (ar7240_reg_rd(AR7240_REV_ID) & 0xf) {
+			ar7240_reg_wr(AR7240_RESET,
+				(AR7240_RESET_FULL_CHIP | AR7240_RESET_DDR));
+		} else {
+			/*
+			 * WAR for full chip reset spi vs. boot-rom selection
+			 * bug in wasp 1.0
+			 */
+			ar7240_reg_wr (AR7240_GPIO_OE,
+				ar7240_reg_rd(AR7240_GPIO_OE) & (~(1 << 17)));
+		}
+#else
+		ar7240_reg_wr(AR7240_RESET,
+			(AR7240_RESET_FULL_CHIP | AR7240_RESET_DDR));
+#endif
+	}
+#endif
+#ifndef COMPRESSED_UBOOT
+	fprintf(stderr, "*** reset failed ***\n");
+#endif  /* #ifndef COMPRESSED_UBOOT */
+	return 0;
+}
 
-	dcache_flush_range(a, end);
+void flush_cache (ulong start_addr, ulong size)
+{
+    u32 end, a;
+
+    a = start_addr & ~(CFG_CACHELINE_SIZE - 1);
+    size = (size + CFG_CACHELINE_SIZE - 1) & ~(CFG_CACHELINE_SIZE - 1);
+    end = a + size;
+
+    dcache_flush_range(a, end);
+}
+
+void flush_dcache_range(ulong start_addr, ulong stop)
+{
+	unsigned long lsize = CONFIG_SYS_CACHELINE_SIZE;
+	unsigned long addr = start_addr & ~(lsize - 1);
+	unsigned long aend = (stop - 1) & ~(lsize - 1);
+
+	while (1) {
+		cache_op(Hit_Writeback_Inv_D, addr);
+		if (addr == aend)
+			break;
+		addr += lsize;
+	}
+}
+
+void invalidate_dcache_range(ulong start_addr, ulong stop)
+{
+	unsigned long lsize = CONFIG_SYS_CACHELINE_SIZE;
+	unsigned long addr = start_addr & ~(lsize - 1);
+	unsigned long aend = (stop - 1) & ~(lsize - 1);
+
+	while (1) {
+		cache_op(Hit_Invalidate_D, addr);
+		if (addr == aend)
+			break;
+		addr += lsize;
+	}
+}
+
+void write_one_tlb( int index, u32 pagemask, u32 hi, u32 low0, u32 low1 ){
+	write_32bit_cp0_register(CP0_ENTRYLO0, low0);
+	write_32bit_cp0_register(CP0_PAGEMASK, pagemask);
+	write_32bit_cp0_register(CP0_ENTRYLO1, low1);
+	write_32bit_cp0_register(CP0_ENTRYHI, hi);
+	write_32bit_cp0_register(CP0_INDEX, index);
+	tlb_write_indexed();
 }

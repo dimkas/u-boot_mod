@@ -35,6 +35,8 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+extern int reset_button_status(void);
+
 //#define	BOARD_DEBUG
 
 #if ( ((CFG_ENV_ADDR+CFG_ENV_SIZE) < CFG_MONITOR_BASE) || (CFG_ENV_ADDR >= (CFG_MONITOR_BASE + CFG_MONITOR_LEN)) ) || defined(CFG_ENV_IS_IN_NVRAM)
@@ -52,6 +54,7 @@ extern int timer_init(void);
 
 extern void all_led_on(void);
 extern void all_led_off(void);
+
 extern const char* print_mem_type(void);
 extern void ar7240_sys_frequency(u32 *cpu_freq, u32 *ddr_freq, u32 *ahb_freq);
 
@@ -413,6 +416,16 @@ void board_init_r(gd_t *id, ulong dest_addr){
 
 		printf("## Error: MAC is invalid, using fixed!\n\n");
 	}
+	else
+	{
+		printf("MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n\n",
+			buffer[0],
+			buffer[1],
+			buffer[2],
+			buffer[3],
+			buffer[4],
+			buffer[5]);
+	}
 #else
 	// fake MAC
 	// 00-03-7F (Atheros Communications, Inc.)
@@ -457,9 +470,12 @@ void board_init_r(gd_t *id, ulong dest_addr){
 	}
 #endif	/* CFG_CMD_NET */
 
-	/* blink all available LEDs */
-	printf("LED on during eth initialization...\n\n");
-	all_led_on();
+	if(!reset_button_status())
+	{
+		/* blink all available LEDs */
+		printf("LED on during eth initialization...\n\n");
+		all_led_on();
+	}
 
 #if (CONFIG_COMMANDS & CFG_CMD_NET)
 	eth_initialize(gd->bd);

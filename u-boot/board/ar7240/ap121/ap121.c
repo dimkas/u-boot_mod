@@ -34,6 +34,8 @@ void led_toggle(void){
 	gpio ^= 1 << GPIO_SYS_LED_BIT;
 #elif defined(CONFIG_FOR_GS_OOLITE_V1_DEV)
 	gpio ^= 1 << GPIO_SYS_LED_BIT;
+#elif defined(CONFIG_FOR_BSB)
+	gpio ^= 1 << GPIO_SYS_LED_BIT;
 #elif defined(CONFIG_FOR_8DEVICES_CARAMBOLA2)
 	gpio ^= 1 << GPIO_WLAN_LED_BIT;
 #elif defined(CONFIG_FOR_DRAGINO_V2)
@@ -83,6 +85,8 @@ void all_led_on(void){
 	SETBITVAL(gpio, GPIO_WAN_LED_BIT, GPIO_WAN_LED_ON);
 	SETBITVAL(gpio, GPIO_LAN1_LED_BIT, GPIO_LAN1_LED_ON);
 	SETBITVAL(gpio, GPIO_LAN2_LED_BIT, GPIO_LAN2_LED_ON);
+#elif defined(CONFIG_FOR_BSB)
+	SETBITVAL(gpio, GPIO_SYS_LED_BIT, GPIO_SYS_LED_ON);
 #elif defined(CONFIG_FOR_8DEVICES_CARAMBOLA2)
 	SETBITVAL(gpio, GPIO_WLAN_LED_BIT, GPIO_WLAN_LED_ON);
 #elif defined(CONFIG_FOR_DRAGINO_V2)
@@ -135,6 +139,8 @@ void all_led_off(void){
 	SETBITVAL(gpio, GPIO_WAN_LED_BIT, !GPIO_WAN_LED_ON);
 	SETBITVAL(gpio, GPIO_LAN1_LED_BIT, !GPIO_LAN1_LED_ON);
 	SETBITVAL(gpio, GPIO_LAN2_LED_BIT, !GPIO_LAN2_LED_ON);
+#elif defined(CONFIG_FOR_BSB)
+	SETBITVAL(gpio, GPIO_SYS_LED_BIT, !GPIO_SYS_LED_ON);
 #elif defined(CONFIG_FOR_8DEVICES_CARAMBOLA2)
 	SETBITVAL(gpio, GPIO_WLAN_LED_BIT, !GPIO_WLAN_LED_ON);
 #elif defined(CONFIG_FOR_DRAGINO_V2)
@@ -368,6 +374,23 @@ void gpio_config(void){
 
 	// turn on power on USB and turn off RED LEDs
 	ar7240_reg_wr(AR7240_GPIO_SET, 0x47D4103);
+
+#elif defined(CONFIG_FOR_BSB)
+
+	/* LED's GPIOs on Black Swift board:
+	 *
+	 * 27	=> SYS LED (red) - output
+	 * 11	=> Reset switch (active low) - in (like all other by default)
+	 * 13-17=> output only (see AR9331 datasheet)
+	 *
+	 */
+
+	// set GPIO_OE
+	ar7240_reg_wr(AR7240_GPIO_OE, (ar7240_reg_rd(AR7240_GPIO_OE) | 0x803E000));
+
+	// turn off all
+	ar7240_reg_wr(AR7240_GPIO_SET, 0x0);
+
 #else
 	#error "Custom GPIO config in gpio_config() not defined!"
 #endif

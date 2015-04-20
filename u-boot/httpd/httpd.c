@@ -196,7 +196,7 @@ static int httpd_findandstore_firstchunk(void){
 				if((webfailsafe_upgrade_type == WEBFAILSAFE_UPGRADE_TYPE_UBOOT) && (hs->upload_total != WEBFAILSAFE_UPLOAD_UBOOT_SIZE_IN_BYTES)){
 
 					printf("## Error: wrong file size, should be: %d bytes!\n", WEBFAILSAFE_UPLOAD_UBOOT_SIZE_IN_BYTES);
-					webfailsafe_upload_failed = 1;
+//					webfailsafe_upload_failed = 1;
 
 				// ART
 				} else if((webfailsafe_upgrade_type == WEBFAILSAFE_UPGRADE_TYPE_ART) && (hs->upload_total != WEBFAILSAFE_UPLOAD_ART_SIZE_IN_BYTES)){

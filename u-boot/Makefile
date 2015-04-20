@@ -121,6 +121,7 @@ endif
 
 LIBS += lib_$(ARCH)/lib$(ARCH).a
 LIBS += drivers/libdrivers.a
+LIBS += disk/libdisk.a fs/libfs.a fs/fat/libfat.a
 LIBS += net/libnet.a
 LIBS += rtc/librtc.a
 LIBS += httpd/libhttpd.a
@@ -282,9 +283,10 @@ ifdef DISABLE_CONSOLE_OUTPUT
 	@echo "#define CONFIG_SILENT_CONSOLE                1" >> include/config.h
 endif
 
-	@echo "#define CONFIG_DELAY_TO_AUTORUN_HTTPD        3" >> include/config.h
-	@echo "#define CONFIG_DELAY_TO_AUTORUN_CONSOLE      5" >> include/config.h
-	@echo "#define CONFIG_DELAY_TO_AUTORUN_NETCONSOLE   7" >> include/config.h
+	@echo "#define CONFIG_DELAY_TO_AUTORUN_USB          2" >> include/config.h
+	@echo "#define CONFIG_DELAY_TO_AUTORUN_CONSOLE      4" >> include/config.h
+	@echo "#define CONFIG_DELAY_TO_AUTORUN_HTTPD        6" >> include/config.h
+	@echo "#define CONFIG_DELAY_TO_AUTORUN_NETCONSOLE   8" >> include/config.h
 
 	# max delay time for button pressing
 	@echo "#define CONFIG_MAX_BUTTON_PRESSING          10" >> include/config.h
@@ -465,6 +467,18 @@ gs_oolite_v1_dev_config : unconfig hornet_common_config
 	@echo "#define GPIO_RST_BUTTON_BIT                 11" >> include/config.h
 	@echo "#define DEFAULT_FLASH_SIZE_IN_MB            16" >> include/config.h
 	@echo "#define BOARD_CUSTOM_STRING                  \"AP121 (AR9331) U-Boot for GS-Oolite v1\"" >> include/config.h
+	
+	@./mkconfig -a ap121 mips mips ap121 ar7240 ar7240
+
+bsb_config : unconfig hornet_common_config
+	@echo '======= Configuring for Black Swift board (128K compressed) at:' `date` '======='
+	@echo "#define CONFIG_FOR_BSB		            1" >> include/config.h
+	@echo "#define GPIO_SYS_LED_BIT                    27" >> include/config.h
+	@echo "#define GPIO_SYS_LED_ON                      0" >> include/config.h
+	@echo "#define GPIO_RST_BUTTON_BIT                 11" >> include/config.h
+	@echo "#define GPIO_RST_BUTTON_IS_ACTIVE_LOW        1" >> include/config.h
+	@echo "#define DEFAULT_FLASH_SIZE_IN_MB            16" >> include/config.h
+	@echo "#define BOARD_CUSTOM_STRING                  \"U-Boot for Black Swift board (AR9331) r1.01\"" >> include/config.h
 	
 	@./mkconfig -a ap121 mips mips ap121 ar7240 ar7240
 

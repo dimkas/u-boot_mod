@@ -28,7 +28,7 @@
 #include <asm/byteorder.h>
 #include <asm/addrspace.h>
 
-//#define DEBUG
+#define DEBUG
 
 #ifdef CONFIG_AR7240
 #include <ar7240_soc.h>

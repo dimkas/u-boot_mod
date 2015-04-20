@@ -188,6 +188,8 @@ mips_cache_reset:
 
 	/* Set invalid tag.
 	 */
+
+
 	mtc0	zero, CP0_TAGLO
 #ifdef CONFIG_WASP_SUPPORT
 	mtc0	zero, $29	# C0_TagHi
@@ -293,7 +295,11 @@ dcache_disable:
 * RETURNS: N/A
 *
 */
-#define	CACHE_LOCK_SIZE	(CFG_DCACHE_SIZE)
+#if defined(CONFIG_PURPLE)
+# define	CACHE_LOCK_SIZE	(CFG_DCACHE_SIZE/2)
+#else
+# define	CACHE_LOCK_SIZE	(CFG_DCACHE_SIZE)
+#endif
 	.globl	mips_cache_lock
 	.ent	mips_cache_lock
 mips_cache_lock:

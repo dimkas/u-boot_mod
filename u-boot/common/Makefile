@@ -33,6 +33,13 @@ COBJS	= main.o \
 		  cmd_flash.o \
 		  cmd_mem.o \
 		  cmd_custom.o \
+		  cmd_load.o \
+		  cmd_usb.o \
+		  cmd_fat.o \
+		  s_record.o \
+		  serial.o \
+		  xyzModem.o \
+		  crc16.o \
 		  cmd_net.o \
 		  cmd_nvedit.o \
 		  cmd_itest.o \
@@ -45,6 +52,9 @@ COBJS	= main.o \
 		  env_nowhere.o \
 		  exports.o \
 		  flash.o \
+		  usb.o \
+		  usb_hub.o \
+		  usb_storage.o \
 		  lists.o \
 		  env_flash.o \
 		  hush.o
