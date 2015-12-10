@@ -1,7 +1,8 @@
 export BUILD_TOPDIR=$(PWD)
 export STAGING_DIR=$(BUILD_TOPDIR)/tmp
 
-export MAKECMD=make --silent --no-print-directory ARCH=mips CROSS_COMPILE=mips-linux-gnu-
+#export MAKECMD=make --silent --no-print-directory ARCH=mips CROSS_COMPILE=mips-linux-gnu-
+export MAKECMD=make --silent --no-print-directory ARCH=mips CROSS_COMPILE=/opt/mips-2015.05/bin/mips-linux-gnu-
 
 # boot delay (time to autostart boot command)
 export CONFIG_BOOTDELAY=1
