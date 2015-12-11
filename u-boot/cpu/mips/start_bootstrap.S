@@ -1,28 +1,3 @@
-/*
- *  Startup Code for MIPS32 CPU-core
- *
- *  Copyright (c) 2003	Wolfgang Denk <wd@denx.de>
- *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- */
-
-
 #include <config.h>
 #include <version.h>
 #include <asm/regdef.h>
@@ -30,7 +5,34 @@
 #include <asm/addrspace.h>
 #include <ar7240_soc.h>
 
-#define AR7100_SPI_CLOCK  0x1F000004
+#define Index_Load_Tag_D	0x05
+
+	.macro	mips_cache_lock_24k
+	.set push
+	.set noreorder
+
+	li      t0, 0x1f00
+	li      t1, CFG_CACHELINE_SIZE
+	li      t2, KSEG0
+	addu    t3, t0, t2
+	mtc0    zero, CP0_TAGLO
+
+cache_loop_lock:
+	li      t5, 0xfffff000
+	and     t4, t2, t5
+	ori     t4, t4, (1 << 7)
+	mtc0    t4, CP0_TAGLO
+
+	cache   Index_Load_Tag_D, 0(t2)
+	cache   0x1d, 0(t2)
+	addu    t2, t1
+	bne     t2, t3, cache_loop_lock
+	 nop
+
+	.set	pop
+	.endm
+
+#define ATH_SPI_CLOCK	0x1F000004
 
 #define RVECENT(f,n) \
    b f; nop
@@ -46,421 +48,18 @@
 _start_bootstrap:
 	RVECENT(reset,0)	/* U-boot entry point */
 	RVECENT(reset,1)	/* software reboot */
-	RVECENT(romReserved,2)
-	RVECENT(romReserved,3)
-	RVECENT(romReserved,4)
-	RVECENT(romReserved,5)
-	RVECENT(romReserved,6)
-	RVECENT(romReserved,7)
-	RVECENT(romReserved,8)
-	RVECENT(romReserved,9)
-	RVECENT(romReserved,10)
-	RVECENT(romReserved,11)
-	RVECENT(romReserved,12)
-	RVECENT(romReserved,13)
-	RVECENT(romReserved,14)
-	RVECENT(romReserved,15)
-	RVECENT(romReserved,16)
-	RVECENT(romReserved,17)
-	RVECENT(romReserved,18)
-	RVECENT(romReserved,19)
-	RVECENT(romReserved,20)
-	RVECENT(romReserved,21)
-	RVECENT(romReserved,22)
-	RVECENT(romReserved,23)
-	RVECENT(romReserved,24)
-	RVECENT(romReserved,25)
-	RVECENT(romReserved,26)
-	RVECENT(romReserved,27)
-	RVECENT(romReserved,28)
-	RVECENT(romReserved,29)
-	RVECENT(romReserved,30)
-	RVECENT(romReserved,31)
-	RVECENT(romReserved,32)
-	RVECENT(romReserved,33)
-	RVECENT(romReserved,34)
-	RVECENT(romReserved,35)
-	RVECENT(romReserved,36)
-	RVECENT(romReserved,37)
-	RVECENT(romReserved,38)
-	RVECENT(romReserved,39)
-	RVECENT(romReserved,40)
-	RVECENT(romReserved,41)
-	RVECENT(romReserved,42)
-	RVECENT(romReserved,43)
-	RVECENT(romReserved,44)
-	RVECENT(romReserved,45)
-	RVECENT(romReserved,46)
-	RVECENT(romReserved,47)
-	RVECENT(romReserved,48)
-	RVECENT(romReserved,49)
-	RVECENT(romReserved,50)
-	RVECENT(romReserved,51)
-	RVECENT(romReserved,52)
-	RVECENT(romReserved,53)
-	RVECENT(romReserved,54)
-	RVECENT(romReserved,55)
-	RVECENT(romReserved,56)
-	RVECENT(romReserved,57)
-	RVECENT(romReserved,58)
-	RVECENT(romReserved,59)
-	RVECENT(romReserved,60)
-	RVECENT(romReserved,61)
-	RVECENT(romReserved,62)
-	RVECENT(romReserved,63)
-	XVECENT(romExcHandle,0x200)	/* bfc00200: R4000 tlbmiss vector */
-	RVECENT(romReserved,65)
-	RVECENT(romReserved,66)
-	RVECENT(romReserved,67)
-	RVECENT(romReserved,68)
-	RVECENT(romReserved,69)
-	RVECENT(romReserved,70)
-	RVECENT(romReserved,71)
-	RVECENT(romReserved,72)
-	RVECENT(romReserved,73)
-	RVECENT(romReserved,74)
-	RVECENT(romReserved,75)
-	RVECENT(romReserved,76)
-	RVECENT(romReserved,77)
-	RVECENT(romReserved,78)
-	RVECENT(romReserved,79)
-	XVECENT(romExcHandle,0x280)	/* bfc00280: R4000 xtlbmiss vector */
-	RVECENT(romReserved,81)
-	RVECENT(romReserved,82)
-	RVECENT(romReserved,83)
-	RVECENT(romReserved,84)
-	RVECENT(romReserved,85)
-	RVECENT(romReserved,86)
-	RVECENT(romReserved,87)
-	RVECENT(romReserved,88)
-	RVECENT(romReserved,89)
-	RVECENT(romReserved,90)
-	RVECENT(romReserved,91)
-	RVECENT(romReserved,92)
-	RVECENT(romReserved,93)
-	RVECENT(romReserved,94)
-	RVECENT(romReserved,95)
-	XVECENT(romExcHandle,0x300)	/* bfc00300: R4000 cache vector */
-	RVECENT(romReserved,97)
-	RVECENT(romReserved,98)
-	RVECENT(romReserved,99)
-	RVECENT(romReserved,100)
-	RVECENT(romReserved,101)
-	RVECENT(romReserved,102)
-	RVECENT(romReserved,103)
-	RVECENT(romReserved,104)
-	RVECENT(romReserved,105)
-	RVECENT(romReserved,106)
-	RVECENT(romReserved,107)
-	RVECENT(romReserved,108)
-	RVECENT(romReserved,109)
-	RVECENT(romReserved,110)
-	RVECENT(romReserved,111)
-	XVECENT(romExcHandle,0x380)	/* bfc00380: R4000 general vector */
-	RVECENT(romReserved,113)
-	RVECENT(romReserved,114)
-	RVECENT(romReserved,115)
-	RVECENT(romReserved,116)
-	RVECENT(romReserved,116)
-	RVECENT(romReserved,118)
-	RVECENT(romReserved,119)
-	RVECENT(romReserved,120)
-	RVECENT(romReserved,121)
-	RVECENT(romReserved,122)
-	RVECENT(romReserved,123)
-	RVECENT(romReserved,124)
-	RVECENT(romReserved,125)
-	RVECENT(romReserved,126)
-	RVECENT(romReserved,127)
 
 	/* We hope there are no more reserved vectors!
 	 * 128 * 8 == 1024 == 0x400
 	 * so this is address R_VEC+0x400 == 0xbfc00400
 	 */
+
 	.align 4
 reset:
 
-#if defined(CONFIG_WASP_SUPPORT)
-
-	// Disable JTAG (bit 1 set) and ALL clock observation (bit 2~9 reset)
-	li  a1, AR934X_GPIO_FUNCTION
-	li  v1, 0x2
-	sw  v1, 0(a1)
-
-#if defined(CONFIG_FOR_TPLINK_WDR3600_WDR43X0_V1)
-	/*
-	 * LEDs and buttons GPIOs on WDR3600/WDR43x0 v1:
-	 *
-	 * 11 => USB1 LED
-	 * 12 => USB2 LED
-	 * 13 => WLAN2G
-	 * 14 => SYS
-	 * 15 => QSS
-	 * 21 => USB2 POWER (active high)
-	 * 22 => USB1 POWER (active high)
-	 *
-	 * 16 => Reset button
-	 * 17 => Wi-Fi ON/OFF switch
-	 *
-	 * All OUT GPIOs are active LOW if not stated otherwise
-	 */
-
-	// GPIO Init
-	li  a1, AR934X_GPIO_OE
-	lw  v1, 0(a1)
-	// Set GPIOs 11~15 and 21~22 as outputs
-	and v1, v1, 0xFF9F07FF
-	// Set GPIOs 16~17 as inputs
-	or  v1, v1, 0x30000
-	sw  v1, 0(a1)
-
-	// Set GPIO function for GPIO 11
-	li	a1, AR934X_GPIO_OUT_FUNCTION2
-	lw	v1, 0(a1)
-	and v1, v1, 0x00FFFFFF
-	sw	v1, 0(a1)
-
-	// Set GPIO function for GPIOs 12~15
-	li	a1, AR934X_GPIO_OUT_FUNCTION3
-	li	v1, 0x0
-	sw	v1, 0(a1)
-
-	// Turn on power on both USB
-	li  a1, AR934X_GPIO_SET
-	li	v1, 0x600000
-	sw	v1, 0(a1)
-
-	// Turn on all LEDs
-	li  a1, AR934X_GPIO_CLEAR
-	li	v1, 0xF800
-	sw	v1, 0(a1)
-
-	// Wait for a while, for leds bootup blink
-	li  a1, 0
-	li  v1, 0x70000
-
-1:
-	addi a1, a1, 1
-	bne  a1, v1, 1b
-	nop
-
-	// Turn off all LEDs
-	li  a1, AR934X_GPIO_SET
-	li	v1, 0xF800
-	sw	v1, 0(a1)
-
-#elif defined(CONFIG_FOR_TPLINK_WDR3500_V1)
-	/*
-	 * LEDs and buttons GPIOs on WDR3500 v1:
-	 *
-	 * 11 => USB LED
-	 * 12 => USB POWER (active high)
-	 * 13 => WLAN2G
-	 * 14 => SYS
-	 * 15 => QSS
-	 * 18 => WAN
-	 * 19 => LAN1
-	 * 20 => LAN2
-	 * 21 => LAN3
-	 * 22 => LAN4
-	 *
-	 * 16 => Reset button
-	 * 17 => Wi-Fi ON/OFF switch
-	 *
-	 * All OUT GPIOs are active LOW if not stated otherwise
-	 */
-
-	// GPIO Init
-	li  a1, AR934X_GPIO_OE
-	lw  v1, 0(a1)
-	// Set GPIOs 11~15 and 18~22 as outputs
-	and v1, v1, 0xFF8307FF
-	// Set GPIOs 16~17 as inputs
-	or  v1, v1, 0x30000
-	sw  v1, 0(a1)
-
-	// Set GPIO function for GPIO 11
-	li	a1, AR934X_GPIO_OUT_FUNCTION2
-	lw	v1, 0(a1)
-	and v1, v1, 0x00FFFFFF
-	sw	v1, 0(a1)
-
-	// Set GPIO function for GPIOs 12~15
-	li	a1, AR934X_GPIO_OUT_FUNCTION3
-	li	v1, 0x0
-	sw	v1, 0(a1)
-
-	// Set GPIO function for GPIOs 18~19
-	li	a1, AR934X_GPIO_OUT_FUNCTION4
-	lw	v1, 0(a1)
-	and v1, v1, 0xFFFF
-	sw	v1, 0(a1)
-
-	// Turn on power on USB
-	li  a1, AR934X_GPIO_SET
-	li	v1, 0x1000
-	sw	v1, 0(a1)
-
-	// Turn off all LEDs
-	li  a1, AR934X_GPIO_SET
-	li	v1, 0x7CF800
-	sw	v1, 0(a1)
-
-#elif defined(CONFIG_FOR_TPLINK_WR841N_V8)
-	/*
-	 * LEDs and buttons GPIOs on WR841N/D v8:
-	 *
-	 * 12 => LAN4
-	 * 13 => WLAN
-	 * 14 => SYS
-	 * 15 => QSS
-	 * 18 => WAN
-	 * 19 => LAN1
-	 * 20 => LAN2
-	 * 21 => LAN3
-	 *
-	 * 16 => Wi-Fi ON/OFF switch
-	 * 17 => Reset button
-	 *
-	 * All OUT GPIOs are active LOW if not stated otherwise
-	 */
-
-	// GPIOs init
-	li  a1, AR934X_GPIO_OE
-	lw  v1, 0(a1)
-	// Set GPIOs 12~15 and 18~21 as outputs
-	and v1, v1, 0xFFC30FFF
-	// Set GPIOs 16~17 as inputs
-	or  v1, v1, 0x30000
-	sw  v1, 0(a1)
-
-	// Set gpio function for GPIOs 12~15
-	li	a1, AR934X_GPIO_OUT_FUNCTION3
-	li	v1, 0x0
-	sw	v1, 0(a1)
-
-	// Set GPIO function for GPIOs 18~19
-	li	a1, AR934X_GPIO_OUT_FUNCTION4
-	lw	v1, 0(a1)
-	and v1, v1, 0xFFFF
-	sw	v1, 0(a1)
-
-	// Turn off all LEDs
-	li  a1, AR934X_GPIO_SET
-	li	v1, 0x3CF000
-	sw	v1, 0(a1)
-
-#elif defined(CONFIG_FOR_TPLINK_MR3420_V2)
-	/*
-	 * LEDs and buttons GPIOs on MR3420 v2:
-	 *
-	 * 4  => USB Power (active high)
-	 * 11 => USB/3G LED
-	 * 12 => LAN4
-	 * 13 => WLAN
-	 * 14 => SYS
-	 * 15 => QSS
-	 * 18 => WAN
-	 * 19 => LAN1
-	 * 20 => LAN2
-	 * 21 => LAN3
-	 *
-	 * 16 => WPS button
-	 * 17 => Reset button
-	 *
-	 * All OUT GPIOs are active LOW if not stated otherwise
-	 */
-
-	// GPIOs init
-	li  a1, AR934X_GPIO_OE
-	lw  v1, 0(a1)
-	// Set GPIOs 4, 11~15 and 18~21 as outputs
-	and v1, v1, 0xFFC307EF
-	// Set GPIOs 16~17 as inputs
-	or  v1, v1, 0x30000
-	sw  v1, 0(a1)
-
-	// Set GPIO function for GPIO 4
-	li	a1, AR934X_GPIO_OUT_FUNCTION1
-	lw	v1, 0(a1)
-	and v1, v1, 0xFFFFFF00
-	sw	v1, 0(a1)
-
-	// Set GPIO function for GPIO 11
-	li	a1, AR934X_GPIO_OUT_FUNCTION2
-	lw	v1, 0(a1)
-	and v1, v1, 0x00FFFFFF
-	sw	v1, 0(a1)
-
-	// Set GPIO function for GPIOs 12~15
-	li	a1, AR934X_GPIO_OUT_FUNCTION3
-	li	v1, 0x0
-	sw	v1, 0(a1)
-
-	// Set GPIO function for GPIOs 18~19
-	li	a1, AR934X_GPIO_OUT_FUNCTION4
-	lw	v1, 0(a1)
-	and v1, v1, 0xFFFF
-	sw	v1, 0(a1)
-
-	// Turn on power on USB
-	li  a1, AR934X_GPIO_SET
-	li	v1, 0x10
-	sw	v1, 0(a1)
-
-	// Turn off all LEDs
-	li  a1, AR934X_GPIO_SET
-	li	v1, 0x3CF800
-	sw	v1, 0(a1)
-
-#elif defined(CONFIG_FOR_TPLINK_WA830RE_V2_WA801ND_V2)
-	/*
-	 * LEDs and buttons GPIOs on WA830REv2 and WA801ND v2:
-	 *
-	 * 13 => WLAN
-	 * 14 => SYS
-	 * 15 => QSS
-	 * 18 => LAN
-	 *
-	 * 16 => Range Extender
-	 * 17 => Reset button
-	 *
-	 * All OUT GPIOs are active LOW if not stated otherwise
-	 */
-
-	// GPIOs init
-	li  a1, AR934X_GPIO_OE
-	lw  v1, 0(a1)
-	// Set GPIOs 13~15 and 18 as outputs
-	and v1, v1, 0xFFFB1FFF
-	// Set GPIOs 16~17 as inputs
-	or  v1, v1, 0x30000
-	sw  v1, 0(a1)
-
-	// Set GPIO function for GPIOs 13~15
-	li	a1, AR934X_GPIO_OUT_FUNCTION3
-	lw	v1, 0(a1)
-	and v1, v1, 0xFF
-	sw	v1, 0(a1)
-
-	// Set GPIO function for GPIO 18
-	li	a1, AR934X_GPIO_OUT_FUNCTION4
-	lw	v1, 0(a1)
-	and v1, v1, 0xFF00FFFF
-	sw	v1, 0(a1)
-
-	// Turn off all LEDs
-	li  a1, AR934X_GPIO_SET
-	li	v1, 0x4E000
-	sw	v1, 0(a1)
-
-#endif
-
-#endif /* #if defined(CONFIG_WASP_SUPPORT) */
-
 	/*
 	 * Clearing CP0 registers - This is generally required for the MIPS-24k
-     * core used by Atheros.
+	 * core used by Atheros.
 	 */
 	mtc0	zero, $0
 	mtc0	zero, $1
@@ -492,12 +91,6 @@ reset:
 	mtc0	zero, $26
 	mtc0	zero, $27
 	mtc0	zero, $28
-
-#ifdef CONFIG_WASP_SUPPORT
-	mtc0	zero, $29		# C0_TagHi
-	mtc0	zero, $28, 2	# C0_DTagLo
-	mtc0	zero, $29, 2	# C0_DTagHi
-#endif
 
 	/*
 	 * Clear watch registers.
@@ -550,7 +143,7 @@ do_reset_normal:
     bne t8, t9, do_reset     // if value of 0xbd000000 != 0x12345678 , go to do_reset
     nop
     li  t9, 0xffffffff
-    sw  t9, 0(t7) 
+    sw  t9, 0(t7)
     b   normal_path
     nop
 
@@ -561,7 +154,7 @@ do_reset:
     li  t9, 0x1000000        // bit24, fullchip reset
     or  t8, t8, t9
     sw  t8, 0(t7)
-do_reset_loop:    
+do_reset_loop:
     b   do_reset_loop
     nop
 
@@ -572,23 +165,19 @@ normal_path:
 
 	/* Initialize any external memory.
 	 */
-#if defined(CONFIG_AR7100) || defined(CONFIG_AR7240)
-	la      t9, lowlevel_init
+	la      t9, hornet_pll_init
 	jalr    t9
 	nop
 	nop
 
-#if defined(CONFIG_MACH_HORNET)
 	la      t9, hornet_ddr_init
 	jalr    t9
 	nop
 	nop
-#endif
 
 	la	t0, rel_start
 	j	t0
 	nop
-#endif
 
 rel_start:
 
@@ -596,23 +185,9 @@ rel_start:
 	/* REMAP_DISABLE */
 	// TODO: SPI clock from FLASH?
 	// for now we will use divider = 10 ( (4+1)*2 )
-	li	a0, KSEG1ADDR(AR7100_SPI_CLOCK)
+	li	a0, KSEG1ADDR(ATH_SPI_CLOCK)
 	li	t0, 0x44
 	sw	t0, 0(a0)
-#endif
-
-#if defined(CONFIG_AR9100) && defined(CFG_HOWL_1_2)
-    /* Disable remap for parallel flash */
-    li  t7, AR9100_FLASH_CONFIG;
-    lw  t8, 0(t7);
-    li  t9, 0xffbf0000;
-    and t8, t8, t9;
-    li  t9, 0x22fc;
-    or  t8, t8, t9;
-    li  t9, 0xffcfffff; /* scale = 0 */
-    and t8, t8, t9;
-    sw  t8, 0(t7);
-
 #endif
 
 	/* Initialize caches...
@@ -626,20 +201,7 @@ rel_start:
 	li	t0, CONF_CM_CACHABLE_NONCOHERENT
 	mtc0	t0, CP0_CONFIG
 
-#if !defined(CONFIG_AR7100) && !defined(CONFIG_AR7240)
-	/* Set up temporary stack.
-	 */
-	li	a0, CFG_INIT_SP_OFFSET
-	la      t9, mips_cache_lock
-	jalr    t9
-	nop
-#endif
-
-#if defined(CONFIG_AR7100) || defined(CONFIG_AR7240)
-    la      t9, mips_cache_lock_24k
-    jalr    t9
-    nop
-#endif
+	mips_cache_lock_24k
 
 	li	t0, CFG_SDRAM_BASE + CFG_INIT_SP_OFFSET
 	la	sp, 0(t0)
@@ -647,7 +209,6 @@ rel_start:
 	la	t9, bootstrap_board_init_f
 	j	t9
 	nop
-
 
 /*
  * void bootstrap_relocate_code (addr_sp, gd, addr_moni)

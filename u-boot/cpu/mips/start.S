@@ -5,6 +5,31 @@
 #include <asm/addrspace.h>
 #include <ar7240_soc.h>
 
+	.macro	mips_cache_lock_24k
+	.set push
+	.set noreorder
+
+	li      t0, 0x1f00
+	li      t1, CFG_CACHELINE_SIZE
+	li      t2, KSEG0
+	addu    t3, t0, t2
+	mtc0    zero, CP0_TAGLO
+
+cache_loop_lock:
+	li      t5, 0xfffff000
+	and     t4, t2, t5
+	ori     t4, t4, (1 << 7)
+	mtc0    t4, CP0_TAGLO
+
+	cache   Index_Load_Tag_D, 0(t2)
+	cache   0x1d, 0(t2)
+	addu    t2, t1
+	bne     t2, t3, cache_loop_lock
+	 nop
+
+	.set	pop
+	.endm
+
 #define ATH_SPI_CLOCK	0x1F000004
 
 #define RVECENT(f,n) \
@@ -90,11 +115,9 @@ reset:
 	mtc0	zero, CP0_COUNT
 	mtc0	zero, CP0_COMPARE
 
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
 	/* CONFIG0 register */
 	li	t0, CONF_CM_UNCACHED
 	mtc0	t0, CP0_CONFIG
-#endif /* #ifndef CONFIG_SKIP_LOWLEVEL_INIT */
 
 #endif /* #ifndef COMPRESSED_UBOOT */
 
@@ -159,14 +182,13 @@ rel_start:
 
 #if defined(CONFIG_AR7100) || defined(CONFIG_AR7240) || defined(CONFIG_ATHEROS)
 	/* REMAP_DISABLE */
-	li	a0,	KSEG1ADDR(ATH_SPI_CLOCK)
 	// TODO: SPI clock from FLASH?
 	// for now we will use divider = 10 ( (4+1)*2 )
-	li	t0,	0x44
-	sw	t0,	0(a0)
+	li	a0, KSEG1ADDR(ATH_SPI_CLOCK)
+	li	t0, 0x44
+	sw	t0, 0(a0)
 #endif
 
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
 	/* Initialize caches...
 	 */
 	la      t9, simple_mips_cache_reset
@@ -175,16 +197,10 @@ rel_start:
 
 	/* ... and enable them.
 	 */
+1:	li	t0, CONF_CM_CACHABLE_NONCOHERENT
+	mtc0	t0, CP0_CONFIG
 
-1:	li	t0,	CONF_CM_CACHABLE_NONCOHERENT
-2:	mtc0	t0,	CP0_CONFIG
-
-#if defined(CONFIG_AR7100) || defined(CONFIG_AR7240)
-    la      t9, mips_cache_lock_24k
-    jalr    t9
-    nop
-#endif
-#endif /* #ifndef CONFIG_SKIP_LOWLEVEL_INIT */
+	mips_cache_lock_24k
 
 #endif /* #ifndef COMPRESSED_UBOOT */
 
