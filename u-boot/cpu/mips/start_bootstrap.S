@@ -32,31 +32,45 @@ cache_loop_lock:
 	.set	pop
 	.endm
 
-#define ATH_SPI_CLOCK	0x1F000004
-
-#define RVECENT(f,n) \
-   b f; nop
-
-#define XVECENT(f,bev) \
-   b f     ;           \
-   li k0,bev
-
+	.macro	hornet_1_1_war
+	.set push
 	.set noreorder
 
-	.globl _start_bootstrap
-	.text
-_start_bootstrap:
-	RVECENT(reset,0)	/* U-boot entry point */
-	RVECENT(reset,1)	/* software reboot */
+/*
+ * WAR: Hornet 1.1 currently need a reset once we boot to let the resetb has
+ *      enough time to stable, so that trigger reset at 1st boot, system team
+ *      is investigaing the issue, will remove in short
+ */
 
-	/* We hope there are no more reserved vectors!
-	 * 128 * 8 == 1024 == 0x400
-	 * so this is address R_VEC+0x400 == 0xbfc00400
-	 */
+	li  t7, 0xbd000000
+	lw  t8, 0(t7)            // t8 : value of 0xbd000000
+	li  t9, 0x12345678
+	bne t8, t9, do_reset     // if value of 0xbd000000 != 0x12345678 , go to do_reset
+	 nop
+	li  t9, 0xffffffff
+	sw  t9, 0(t7)
+	b   normal_path
+	 nop
 
-	.align 4
-reset:
+do_reset:
+	sw  t9, 0(t7)
+	li  t7, 0xb806001c       // load reset register 0x1806001c
+	lw  t8, 0(t7)
+	li  t9, 0x1000000        // bit24, fullchip reset
+	or  t8, t8, t9
+	sw  t8, 0(t7)
 
+do_reset_loop:
+	b   do_reset_loop
+	 nop
+
+normal_path:
+	.set	pop
+	.endm
+
+	.macro	hornet_mips24k_cp0_setup
+	.set push
+	.set noreorder
 	/*
 	 * Clearing CP0 registers - This is generally required for the MIPS-24k
 	 * core used by Atheros.
@@ -117,6 +131,18 @@ reset:
 	li	t0, CONF_CM_UNCACHED
 	mtc0	t0, CP0_CONFIG
 
+	.set	pop
+	.endm
+
+#define ATH_SPI_CLOCK	0x1F000004
+
+	.set noreorder
+	.globl _start_bootstrap
+	.text
+	.align 4
+_start_bootstrap:
+
+	hornet_mips24k_cp0_setup
 
     /* Initialize GOT pointer.*/
 	bal     1f
@@ -127,39 +153,7 @@ reset:
 	lw      t1, 0(ra)
 	move	gp, t1
 
-#if defined(CONFIG_MACH_HORNET) && defined(CONFIG_HORNET_1_1_WAR)
-/**************************************************************************/
-/*
- * WAR: Hornet 1.1 currently need a reset once we boot to let the resetb has
- *      enough time to stable, so that trigger reset at 1st boot, system team
- *      is investigaing the issue, will remove in short
- */
-
-do_reset_normal:
-
-    li  t7, 0xbd000000
-    lw  t8, 0(t7)            // t8 : value of 0xbd000000
-    li  t9, 0x12345678
-    bne t8, t9, do_reset     // if value of 0xbd000000 != 0x12345678 , go to do_reset
-    nop
-    li  t9, 0xffffffff
-    sw  t9, 0(t7)
-    b   normal_path
-    nop
-
-do_reset:
-    sw  t9, 0(t7)
-    li  t7, 0xb806001c       // load reset register 0x1806001c
-    lw  t8, 0(t7)
-    li  t9, 0x1000000        // bit24, fullchip reset
-    or  t8, t8, t9
-    sw  t8, 0(t7)
-do_reset_loop:
-    b   do_reset_loop
-    nop
-
-normal_path:
-#endif /* CONFIG_MACH_HORNET */
+	hornet_1_1_war
 
 /**************************************************************************/
 
